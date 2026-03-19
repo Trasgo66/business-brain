@@ -10,6 +10,8 @@
 # ============================================================
 
 set -e
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -192,9 +194,9 @@ esac
 
 echo ""
 echo -e "  ${CYAN}Perfil del negocio:${NC}"
-echo "  1) Quiero delegar más — tengo equipo pero sigo siendo imprescindible"
-echo "  2) Quiero escalar — quiero crecer en facturación o expandirme"
-echo "  3) Ambas — delegar primero, escalar después"
+echo "  1) Quiero delegar mas - tengo equipo pero sigo siendo imprescindible"
+echo "  2) Quiero escalar - quiero crecer en facturacion o expandirme"
+echo "  3) Ambas - delegar primero, escalar despues"
 read -p "  Elige (1/2/3): " PROFILE_NUM
 case $PROFILE_NUM in
     1) PROFILE="delegation"; PROFILE_LABEL="Delegación" ;;
@@ -219,7 +221,7 @@ read -p "  Elige (1/2): " VAULT_MODE_NUM
 TODAY=$(date +%Y-%m-%d)
 
 if [ "$VAULT_MODE_NUM" = "1" ]; then
-    INJECT_MODE=true
+    INJECT_MODE="true"
     echo ""
     echo -e "  ${CYAN}Ruta completa de tu vault existente:${NC}"
     echo -e "  ${YELLOW}Ejemplo: /Users/tuusuario/Documents/Mi-Vault${NC}"
@@ -237,7 +239,7 @@ if [ "$VAULT_MODE_NUM" = "1" ]; then
     echo -e "  ${GREEN}✓${NC} Business Brain se instalará en: ${CYAN}$BRAIN_DIR${NC}"
     echo -e "  ${YELLOW}  Ningún archivo existente será modificado.${NC}"
 else
-    INJECT_MODE=false
+    INJECT_MODE="false"
     echo ""
     echo -e "  ${CYAN}¿Dónde crear el vault? (Enter para usar Documentos)${NC}"
     echo -e "  Default: ${YELLOW}$HOME/Documents/${BUSINESS_NAME}-Brain${NC}"
@@ -256,7 +258,7 @@ echo -e "  • Negocio:  ${CYAN}$BUSINESS_NAME${NC}"
 echo -e "  • Dueño:    ${CYAN}$OWNER_NAME${NC}"
 echo -e "  • Sector:   ${CYAN}$SECTOR_LABEL${NC}"
 echo -e "  • Perfil:   ${CYAN}$PROFILE_LABEL${NC}"
-echo -e "  • Modo:     ${CYAN}$(if $INJECT_MODE; then echo "Inyección en vault existente"; else echo "Vault nuevo"; fi)${NC}"
+echo -e "  • Modo:     ${CYAN}${MODO_DISPLAY}${NC}"
 echo -e "  • Vault:    ${CYAN}$VAULT_PATH${NC}"
 echo ""
 read -p "  ¿Todo correcto? Enter para continuar, Ctrl+C para cancelar..."
@@ -290,7 +292,7 @@ FOLDERS=(
     "_BUSINESS_BRAIN/90_ESTRATEGIA/VAULT_HEALTH"
 )
 
-if $INJECT_MODE; then
+if [ "$INJECT_MODE" = "true" ]; then
     BASE="$VAULT_PATH"
 else
     BASE="$VAULT_PATH"
@@ -303,19 +305,47 @@ done
 
 echo -e "  ${GREEN}✓${NC} Estructura de carpetas creada"
 
-# ── CLAUDE.md ── (el más importante — incluye ruta al vault completo)
-cat > "$BASE/_BUSINESS_BRAIN/00_CEREBRO/CLAUDE.md" << CLAUDEEOF
-# ${BUSINESS_NAME} — Business Brain
+# Pre-computar textos dinamicos para evitar expansiones anidadas en heredocs
+case $PROFILE in
+    delegation) PROFILE_TEXT="Quiero delegar mas. Tengo equipo pero sigo siendo imprescindible. Objetivo: que el negocio funcione sin que yo este en todo." ;;
+    scale)      PROFILE_TEXT="Quiero escalar. El negocio funciona y quiero crecer - mas volumen, mas unidades, o ambas. Objetivo: construir un sistema replicable." ;;
+    *)          PROFILE_TEXT="Quiero primero delegar y despues escalar. En ese orden." ;;
+esac
 
-## Quién Soy
+case $REVENUE_TIER in
+    1) REVENUE_TEXT="300K-500K euros/año" ;;
+    2) REVENUE_TEXT="500K-1M euros/año" ;;
+    3) REVENUE_TEXT="Mas de 1M euros/año" ;;
+    *) REVENUE_TEXT="No especificada" ;;
+esac
+
+if [ "$INJECT_MODE" = "true" ]; then
+    VAULT_STRUCT_TEXT="### Vault principal (LEER COMPLETO con /bb-contexto):
+- Raiz: ${VAULT_PATH}
+- Contiene estructura propia del usuario
+
+### Business Brain (sistema de inteligencia anadido):
+- Ubicacion: ${BRAIN_DIR}"
+else
+    VAULT_STRUCT_TEXT="### Vault Business Brain:
+- Raiz: ${VAULT_PATH}"
+fi
+
+if [ "$INJECT_MODE" = "true" ]; then
+    MODO_DISPLAY="Inyeccion en vault existente"
+else
+    MODO_DISPLAY="Vault nuevo"
+fi
+
+# ── CLAUDE.md ──
+cat > "$BASE/_BUSINESS_BRAIN/00_CEREBRO/CLAUDE.md" << CLAUDEEOF
+# ${BUSINESS_NAME} - Business Brain
+
+## Quien Soy
 **${OWNER_NAME}**, responsable de **${BUSINESS_NAME}** (${SECTOR_LABEL}).
 
-## Mi Situación
-$(case $PROFILE in
-    delegation) echo "Quiero delegar más. Tengo equipo pero sigo siendo imprescindible. Objetivo: que el negocio funcione sin que yo esté en todo." ;;
-    scale) echo "Quiero escalar. El negocio funciona y quiero crecer — más volumen, más unidades, o ambas. Objetivo: construir un sistema replicable." ;;
-    *) echo "Quiero primero delegar y después escalar. En ese orden." ;;
-esac)
+## Mi Situacion
+${PROFILE_TEXT}
 
 ## Mi Negocio
 - **Nombre:** ${BUSINESS_NAME}
@@ -323,17 +353,7 @@ esac)
 - **KPIs principales:** ${KPIS_PRINCIPALES}
 
 ## Estructura del Vault
-$(if $INJECT_MODE; then echo "
-### Vault principal (LEER COMPLETO con /bb-contexto):
-- **Raíz:** \`${VAULT_PATH}\`
-- Contiene estructura propia del usuario — leer y mapear en /bb-contexto
-
-### Business Brain (sistema de inteligencia añadido):
-- **Ubicación:** \`${BRAIN_DIR}\`
-"; else echo "
-### Vault Business Brain:
-- **Raíz:** \`${VAULT_PATH}\`
-"; fi)
+${VAULT_STRUCT_TEXT}
 - \`_BUSINESS_BRAIN/10_OPERACIONES/DAILY_NOTES/\` → Log diario del negocio
 - \`_BUSINESS_BRAIN/20_NUMEROS/\` → Ingresos, costes, KPIs
 - \`_BUSINESS_BRAIN/30_EQUIPO/\` → Perfiles, formación, conversaciones
@@ -1401,7 +1421,7 @@ echo -e "${NC}"
 echo ""
 echo -e "  ${BOLD}Negocio:${NC}      ${CYAN}${BUSINESS_NAME}${NC}"
 echo -e "  ${BOLD}Sector:${NC}       ${CYAN}${SECTOR_LABEL}${NC}"
-echo -e "  ${BOLD}Modo:${NC}         ${CYAN}$(if $INJECT_MODE; then echo "Inyectado en vault existente"; else echo "Vault nuevo"; fi)${NC}"
+echo -e "  ${BOLD}Modo:${NC}         ${CYAN}${MODO_DISPLAY}${NC}"
 echo -e "  ${BOLD}Vault:${NC}        ${CYAN}${VAULT_PATH}${NC}"
 echo -e "  ${BOLD}Archivos:${NC}     ${CYAN}${TOTAL_FILES} archivos creados${NC}"
 echo -e "  ${BOLD}Comandos:${NC}     ${CYAN}${TOTAL_COMMANDS} comandos instalados${NC}"
@@ -1411,13 +1431,13 @@ echo "  ────────────────────────
 echo ""
 echo -e "  ${BOLD}🚀 TUS PRIMEROS 3 PASOS:${NC}"
 echo ""
-echo -e "  ${CYAN}Paso 1 — Ahora mismo:${NC}"
-if $INJECT_MODE; then
-    echo -e "  Abre Obsidian → la carpeta _BUSINESS_BRAIN aparece en tu vault."
-    echo -e "  Abre ${BOLD}_BUSINESS_BRAIN/00_CEREBRO/VISION.md${NC} y escribe tu visión."
+echo -e "  ${CYAN}Paso 1 - Ahora mismo:${NC}"
+if [ "$INJECT_MODE" = "true" ]; then
+    echo -e "  Abre Obsidian - la carpeta _BUSINESS_BRAIN aparece en tu vault."
+    echo -e "  Abre _BUSINESS_BRAIN/00_CEREBRO/VISION.md y escribe tu vision."
 else
-    echo -e "  Abre Obsidian → 'Open folder as vault' → selecciona: ${CYAN}${VAULT_PATH}${NC}"
-    echo -e "  Abre ${BOLD}_BUSINESS_BRAIN/00_CEREBRO/VISION.md${NC} y escribe tu visión."
+    echo -e "  Abre Obsidian - Open folder as vault - selecciona: ${CYAN}${VAULT_PATH}${NC}"
+    echo -e "  Abre _BUSINESS_BRAIN/00_CEREBRO/VISION.md y escribe tu vision."
 fi
 echo ""
 echo -e "  ${CYAN}Paso 2 — Ejecuta el primer análisis:${NC}"
